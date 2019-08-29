@@ -175,14 +175,24 @@ func parseMultipartAlternative(msg io.Reader, boundary string) (textBody, htmlBo
 
 		switch contentType {
 		case contentTypeTextPlain:
-			ppContent, err := ioutil.ReadAll(part)
+			r, err := autoDecodeTextReader(part)
+			if err != nil {
+				return textBody, htmlBody, embeddedFiles, err
+			}
+
+			ppContent, err := ioutil.ReadAll(r)
 			if err != nil {
 				return textBody, htmlBody, embeddedFiles, err
 			}
 
 			textBody += strings.TrimSuffix(string(ppContent[:]), "\n")
 		case contentTypeTextHtml:
-			ppContent, err := ioutil.ReadAll(part)
+			r, err := autoDecodeTextReader(part)
+			if err != nil {
+				return textBody, htmlBody, embeddedFiles, err
+			}
+
+			ppContent, err := ioutil.ReadAll(r)
 			if err != nil {
 				return textBody, htmlBody, embeddedFiles, err
 			}
@@ -212,6 +222,17 @@ func parseMultipartAlternative(msg io.Reader, boundary string) (textBody, htmlBo
 	}
 
 	return textBody, htmlBody, embeddedFiles, err
+}
+
+func autoDecodeTextReader(part *multipart.Part) (r io.Reader, err error) {
+	r = part
+	if isEmbeddedFile(part) {
+		ef, err := decodeEmbeddedFile(part)
+		if err == nil {
+			r = ef.Data
+		}
+	}
+	return r, err
 }
 
 func parseMultipartMixed(msg io.Reader, boundary string) (textBody, htmlBody string, attachments []Attachment, embeddedFiles []EmbeddedFile, err error) {
